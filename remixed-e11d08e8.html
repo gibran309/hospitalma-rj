@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HospitalMap RJ">
+<title>HospitalMap RJ — Lotação em Tempo Real</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0c10;--surface:#111318;--border:#1e2230;
+  --accent:#00e5a0;--text:#e8ecf4;--muted:#5a6080;
+  --green:#00e5a0;--yellow:#ffd166;--red:#ff4d6d;--orange:#ff8c42;
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,229,160,.025)1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,229,160,.025)1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none;z-index:0;
+}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px;position:relative;z-index:1}
+
+/* ── HEADER ── */
+header{
+  padding:18px 0 14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{
+  width:36px;height:36px;background:var(--accent);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;font-size:17px;
+  box-shadow:0 0 16px rgba(0,229,160,.4);flex-shrink:0;
+}
+.logo-text{font-size:19px;font-weight:800;letter-spacing:-.5px}
+.logo-text span{color:var(--accent)}
+.live-badge{
+  display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;
+  color:var(--accent);background:rgba(0,229,160,.1);
+  border:1px solid rgba(0,229,160,.25);padding:5px 11px;border-radius:999px;
+  font-family:monospace;white-space:nowrap;
+}
+.live-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+
+/* ── AD BANNER TOP ── */
+.ad-banner{
+  margin:14px 0 0;background:#0d0f14;
+  border:1px solid #1a1e2a;border-radius:12px;
+  padding:12px 18px;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;overflow:hidden;position:relative;
+}
+.ad-banner::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.015),transparent);
+  pointer-events:none;
+}
+.ad-label{
+  font-size:9px;font-family:monospace;color:#2e3450;
+  text-transform:uppercase;letter-spacing:2px;
+  position:absolute;top:5px;right:10px;
+}
+.ad-content{display:flex;align-items:center;gap:14px;flex:1}
+.ad-icon{font-size:26px;flex-shrink:0}
+.ad-text strong{display:block;font-size:13px;font-weight:700;color:var(--text)}
+.ad-text span{font-size:11px;color:var(--muted)}
+.ad-cta{
+  font-size:11px;font-weight:700;font-family:monospace;
+  background:rgba(0,229,160,.12);color:var(--accent);
+  border:1px solid rgba(0,229,160,.25);padding:6px 14px;
+  border-radius:8px;white-space:nowrap;cursor:pointer;flex-shrink:0;
+  transition:background .2s;
+}
+.ad-cta:hover{background:rgba(0,229,160,.2)}
+
+/* ── URGENCY BUTTON ── */
+.urgency-section{margin:18px 0 0}
+.urg-btn{
+  width:100%;padding:16px 20px;
+  background:linear-gradient(135deg,rgba(255,77,109,.18),rgba(255,140,66,.12));
+  border:1.5px solid rgba(255,77,109,.5);border-radius:14px;
+  display:flex;align-items:center;gap:14px;cursor:pointer;
+  transition:all .25s;position:relative;overflow:hidden;
+}
+.urg-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,77,109,.07),transparent);
+  animation:sweep 2.5s infinite;
+}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.urg-btn:hover{border-color:rgba(255,77,109,.8);box-shadow:0 0 24px rgba(255,77,109,.2)}
+.urg-icon{font-size:28px;flex-shrink:0;animation:wiggle 2s infinite}
+@keyframes wiggle{0%,100%{transform:rotate(0)}10%{transform:rotate(-8deg)}20%{transform:rotate(8deg)}30%{transform:rotate(0)}}
+.urg-text strong{display:block;font-size:15px;font-weight:800;color:#fff}
+.urg-text span{font-size:12px;color:rgba(255,120,140,.9)}
+.urg-arrow{margin-left:auto;font-size:20px;color:var(--red);flex-shrink:0}
+
+/* ── URGENCY MODAL ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);
+  z-index:100;align-items:center;justify-content:center;padding:16px;
+}
+.modal-overlay.show{display:flex;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{
+  background:#0e1016;border:1px solid rgba(255,77,109,.4);
+  border-radius:20px;padding:28px 24px;max-width:420px;width:100%;
+  box-shadow:0 0 60px rgba(255,77,109,.15);
+  animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.modal-title{font-size:18px;font-weight:800}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:20px;font-family:monospace}
+.modal-hosp{
+  display:flex;align-items:center;gap:12px;
+  background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.2);
+  border-radius:12px;padding:14px 16px;margin-bottom:10px;
+}
+.modal-rank{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:monospace;font-weight:700;font-size:13px;flex-shrink:0;
+}
+.rank-1{background:rgba(0,229,160,.2);color:var(--green);border:1.5px solid var(--green)}
+.rank-2{background:rgba(255,209,102,.1);color:var(--yellow);border:1.5px solid var(--yellow)}
+.rank-3{background:rgba(255,77,109,.1);color:var(--red);border:1.5px solid var(--red)}
+.modal-hosp-info{flex:1}
+.modal-hosp-name{font-size:13px;font-weight:700}
+.modal-hosp-meta{font-size:11px;color:var(--muted);font-family:monospace;margin-top:2px}
+.modal-hosp-wait{font-size:12px;font-weight:700;font-family:monospace;white-space:nowrap}
+.modal-hosp.best-urg{
+  background:linear-gradient(135deg,rgba(0,229,160,.12),rgba(0,229,160,.05));
+  border-color:rgba(0,229,160,.4);
+}
+.modal-hosp.best-urg .modal-hosp-wait{color:var(--green)}
+.modal-close{
+  width:100%;margin-top:18px;padding:13px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border);
+  border-radius:10px;color:var(--muted);font-size:13px;
+  cursor:pointer;transition:background .2s;font-family:inherit;
+}
+.modal-close:hover{background:rgba(255,255,255,.09)}
+
+/* ── BEST BANNER ── */
+.best-banner{
+  margin:18px 0 0;
+  background:linear-gradient(135deg,rgba(0,229,160,.11),rgba(0,229,160,.04));
+  border:1px solid rgba(0,229,160,.28);border-radius:16px;
+  padding:16px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.best-icon{font-size:26px;line-height:1;flex-shrink:0}
+.best-content{flex:1;min-width:150px}
+.best-label{font-size:9px;font-family:monospace;color:var(--accent);text-transform:uppercase;letter-spacing:2px;margin-bottom:3px}
+.best-name{font-size:16px;font-weight:800}
+.best-detail{font-size:10px;color:var(--muted);margin-top:2px;font-family:monospace;line-height:1.5}
+.best-wait{font-family:monospace;font-size:11px;color:var(--accent);margin-top:5px}
+.best-count{
+  font-family:monospace;font-size:11px;color:var(--accent);
+  background:rgba(0,229,160,.1);padding:8px 13px;border-radius:8px;
+  text-align:center;white-space:nowrap;flex-shrink:0;
+}
+.best-count strong{display:block;font-size:24px;font-weight:700;line-height:1.1}
+
+/* ── SEC TITLE ── */
+.sec-title{font-size:10px;font-family:monospace;color:var(--muted);text-transform:uppercase;letter-spacing:3px;margin:24px 0 13px}
+
+/* ── HOSPITAL GRID ── */
+.hosp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px;margin-bottom:22px}
+.hcard{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:15px;position:relative;overflow:hidden;
+  transition:border-color .3s,box-shadow .3s;
+}
+.hcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;transition:background .4s}
+.hcard.sl::before{background:var(--green)}
+.hcard.sm::before{background:var(--yellow)}
+.hcard.sh::before{background:var(--red)}
+.hcard.best{border-color:rgba(0,229,160,.4);box-shadow:0 0 20px rgba(0,229,160,.1)}
+
+/* Priority faixa */
+.prio-tag{
+  position:absolute;top:0;left:0;right:0;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  font-size:9px;font-family:monospace;font-weight:700;
+  padding:3px 0;letter-spacing:1px;
+}
+.prio-1{background:rgba(0,229,160,.2);color:var(--green)}
+.prio-2{background:rgba(255,209,102,.15);color:var(--yellow)}
+.prio-3{background:rgba(255,140,66,.15);color:var(--orange)}
+.prio-4{background:rgba(255,77,109,.15);color:var(--red)}
+.prio-5{background:rgba(255,77,109,.22);color:var(--red)}
+
+.card-inner{margin-top:16px}
+.ch{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px}
+.hname{font-size:12px;font-weight:700;line-height:1.3;flex:1;padding-right:5px}
+.spill{font-size:9px;font-family:monospace;padding:2px 6px;border-radius:999px;white-space:nowrap;font-weight:700}
+.sl .spill{background:rgba(0,229,160,.15);color:var(--green)}
+.sm .spill{background:rgba(255,209,102,.15);color:var(--yellow)}
+.sh .spill{background:rgba(255,77,109,.15);color:var(--red)}
+
+.haddr{font-size:10px;color:var(--muted);font-family:monospace;margin-bottom:11px;line-height:1.5}
+.obar{width:100%;height:5px;background:var(--border);border-radius:999px;overflow:hidden;margin-bottom:8px}
+.ofill{height:100%;border-radius:999px;transition:width .8s cubic-bezier(.4,0,.2,1),background .4s}
+.sl .ofill{background:var(--green)}.sm .ofill{background:var(--yellow)}.sh .ofill{background:var(--red)}
+.ocount{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+.cnum{font-family:monospace;font-size:22px;font-weight:700;transition:color .4s}
+.sl .cnum{color:var(--green)}.sm .cnum{color:var(--yellow)}.sh .cnum{color:var(--red)}
+.clbl{font-size:10px;color:var(--muted);font-family:monospace}
+.wrow{display:flex;justify-content:space-between;align-items:center;padding-top:9px;border-top:1px solid var(--border)}
+.wlbl{font-size:9px;color:var(--muted);font-family:monospace;text-transform:uppercase;letter-spacing:1px}
+.wval{font-family:monospace;font-size:11px;font-weight:700}
+.sl .wval{color:var(--green)}.sm .wval{color:var(--yellow)}.sh .wval{color:var(--red)}
+.btag{position:absolute;top:22px;right:9px;font-size:13px}
+
+/* ── AD SIDE (between chart and log) ── */
+.ad-side{
+  background:#0d0f14;border:1px solid #1a1e2a;border-radius:12px;
+  padding:14px 18px;display:flex;align-items:center;gap:14px;
+  margin-bottom:22px;position:relative;overflow:hidden;
+}
+.ad-side::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.012),transparent);pointer-events:none}
+.ad-side .ad-label{font-size:9px;font-family:monospace;color:#2e3450;text-transform:uppercase;letter-spacing:2px;position:absolute;top:5px;right:10px}
+.ad-side-icon{font-size:32px;flex-shrink:0}
+.ad-side-text strong{display:block;font-size:13px;font-weight:700;margin-bottom:2px}
+.ad-side-text span{font-size:11px;color:var(--muted)}
+.ad-side-cta{
+  margin-left:auto;font-size:11px;font-weight:700;font-family:monospace;
+  background:rgba(255,209,102,.12);color:var(--yellow);
+  border:1px solid rgba(255,209,102,.3);padding:7px 14px;
+  border-radius:8px;cursor:pointer;white-space:nowrap;flex-shrink:0;
+  transition:background .2s;
+}
+.ad-side-cta:hover{background:rgba(255,209,102,.22)}
+
+/* ── CHART ── */
+.chart-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:22px}
+.chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.chart-title{font-size:14px;font-weight:700}
+.timer-row{display:flex;align-items:center;gap:7px;font-family:monospace;font-size:10px;color:var(--muted)}
+.tbar{width:80px;height:4px;background:var(--border);border-radius:999px;overflow:hidden}
+.tfill{height:100%;background:var(--accent);border-radius:999px;transition:width 1s linear}
+canvas#chart{width:100%!important;display:block}
+
+/* ── LOG ── */
+.log-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:32px}
+.log-title{font-size:10px;font-family:monospace;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:11px}
+.log-list{display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto}
+.log-item{display:flex;align-items:center;gap:7px;font-size:10px;font-family:monospace;color:var(--muted);animation:sli .3s ease}
+@keyframes sli{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:translateX(0)}}
+.lt{color:var(--accent);white-space:nowrap}
+.lh{color:var(--text)}
+.la{color:#ffd166}
+.ld{color:#ff8c42}
+
+/* ── FOOTER ── */
+footer{border-top:1px solid var(--border);padding:14px 0;font-family:monospace;font-size:10px;color:var(--muted);text-align:center;line-height:1.8}
+
+/* ── FLASH ── */
+.flash{animation:fl .7s ease}
+@keyframes fl{0%{background:rgba(0,229,160,.14)}100%{background:var(--surface)}}
+
+/* ── PLAN MODAL ── */
+.plan-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);
+  z-index:110;align-items:flex-start;justify-content:center;
+  padding:16px;overflow-y:auto;
+}
+.plan-overlay.show{display:flex;animation:fadeIn .2s ease}
+.plan-modal{
+  background:#0e1016;border:1px solid rgba(255,209,102,.35);
+  border-radius:20px;padding:0;max-width:500px;width:100%;
+  box-shadow:0 0 60px rgba(255,209,102,.12);
+  animation:slideUp .25s ease;margin:auto;overflow:hidden;
+}
+.plan-header{
+  background:linear-gradient(135deg,rgba(255,209,102,.14),rgba(255,140,66,.08));
+  padding:22px 22px 18px;border-bottom:1px solid rgba(255,209,102,.15);
+  display:flex;align-items:flex-start;gap:14px;
+}
+.plan-header-icon{font-size:32px;flex-shrink:0;margin-top:2px}
+.plan-header-title{font-size:18px;font-weight:800;line-height:1.2}
+.plan-header-sub{font-size:11px;color:var(--muted);margin-top:4px;font-family:monospace}
+.plan-header-badge{
+  margin-left:auto;flex-shrink:0;
+  background:rgba(255,209,102,.15);color:var(--yellow);
+  border:1px solid rgba(255,209,102,.3);
+  font-size:10px;font-family:monospace;font-weight:700;
+  padding:4px 10px;border-radius:999px;white-space:nowrap;
+}
+.plan-body{padding:18px 22px}
+.plan-subtitle{font-size:10px;font-family:monospace;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px}
+
+.plan-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:16px;margin-bottom:12px;
+  transition:border-color .2s;cursor:default;
+}
+.plan-card:hover{border-color:rgba(255,209,102,.3)}
+.plan-card.destaque{
+  border-color:rgba(255,209,102,.4);
+  background:linear-gradient(135deg,rgba(255,209,102,.07),rgba(255,209,102,.02));
+}
+.pc-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pc-icon{font-size:22px;flex-shrink:0}
+.pc-name{font-size:14px;font-weight:800;flex:1}
+.pc-badge{
+  font-size:9px;font-family:monospace;font-weight:700;
+  padding:2px 8px;border-radius:999px;white-space:nowrap;
+}
+.q-otimo{background:rgba(0,229,160,.15);color:var(--green)}
+.q-bom{background:rgba(255,209,102,.15);color:var(--yellow)}
+.q-regular{background:rgba(255,140,66,.15);color:var(--orange)}
+
+.pc-stars{display:flex;gap:2px;margin-bottom:8px}
+.star{font-size:13px;opacity:.25}.star.on{opacity:1}
+
+.pc-price-row{display:flex;align-items:baseline;gap:6px;margin-bottom:10px}
+.pc-price{font-family:monospace;font-size:22px;font-weight:700;color:var(--yellow)}
+.pc-price-label{font-size:11px;color:var(--muted);font-family:monospace}
+.pc-old{font-family:monospace;font-size:12px;color:var(--muted);text-decoration:line-through}
+
+.pc-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.pc-tag{
+  font-size:10px;font-family:monospace;padding:3px 8px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:6px;color:var(--muted);
+}
+.pc-tag.yes{background:rgba(0,229,160,.07);border-color:rgba(0,229,160,.2);color:var(--green)}
+
+.pc-desc{font-size:12px;color:var(--muted);line-height:1.6;padding-top:10px;border-top:1px solid var(--border)}
+
+.plan-cta{
+  width:100%;margin-top:6px;padding:13px;
+  background:linear-gradient(135deg,rgba(255,209,102,.2),rgba(255,140,66,.15));
+  border:1px solid rgba(255,209,102,.4);
+  border-radius:10px;color:var(--yellow);font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .2s;font-family:inherit;
+}
+.plan-cta:hover{background:linear-gradient(135deg,rgba(255,209,102,.3),rgba(255,140,66,.25))}
+.plan-close{
+  width:100%;margin-top:8px;padding:11px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:10px;color:var(--muted);font-size:12px;
+  cursor:pointer;transition:background .2s;font-family:inherit;
+}
+.plan-close:hover{background:rgba(255,255,255,.08)}
+
+/* ── CAOS CARD ── */
+.hcard.caos{
+  border-color:rgba(255,77,109,.35)!important;
+  background:linear-gradient(160deg,#130d0f,var(--surface))!important;
+}
+.hcard.caos::before{background:var(--red)!important}
+.caos-alert{
+  display:flex;align-items:center;gap:6px;
+  font-size:9px;font-family:monospace;font-weight:700;
+  color:var(--red);background:rgba(255,77,109,.1);
+  border:1px solid rgba(255,77,109,.2);
+  border-radius:6px;padding:4px 8px;margin-top:8px;
+  animation:blink 2s infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── MOBILE ── */
+@media(max-width:480px){
+  .hosp-grid{grid-template-columns:1fr 1fr}
+  .best-banner{padding:13px 14px}
+  .best-name{font-size:14px}
+  .ad-content{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏥</div>
+    <div class="logo-text">Hospital<span>Map</span> RJ</div>
+  </div>
+  <div class="live-badge"><div class="live-dot"></div>AO VIVO</div>
+</header>
+
+<!-- AD BANNER TOP -->
+<div class="ad-banner">
+  <div class="ad-label">Anúncio</div>
+  <div class="ad-content">
+    <div class="ad-icon">💊</div>
+    <div class="ad-text">
+      <strong>Farmácia Delivery 24h — Zona Norte RJ</strong>
+      <span>Medicamentos em até 40 min na sua porta. Parceiro oficial HospitalMap.</span>
+    </div>
+  </div>
+  <div class="ad-cta">Ver oferta →</div>
+</div>
+
+<!-- URGENCY BUTTON -->
+<div class="urgency-section">
+  <button class="urg-btn" onclick="openUrgency()">
+    <div class="urg-icon">🚨</div>
+    <div class="urg-text">
+      <strong>Estou em Urgência — Me leve ao mais rápido!</strong>
+      <span>Ver os 3 hospitais com menor espera agora</span>
+    </div>
+    <div class="urg-arrow">›</div>
+  </button>
+</div>
+
+<!-- BEST BANNER -->
+<div class="best-banner">
+  <div class="best-icon">⭐</div>
+  <div class="best-content">
+    <div class="best-label">Melhor opção agora</div>
+    <div class="best-name" id="bName">—</div>
+    <div class="best-detail" id="bDetail">Calculando...</div>
+    <div class="best-wait" id="bWait">⏱ Tempo de espera: —</div>
+  </div>
+  <div class="best-count"><strong id="bNum">—</strong>na fila</div>
+</div>
+
+<div class="sec-title">— Lotação dos Hospitais</div>
+<div class="hosp-grid" id="grid"></div>
+
+<!-- CHART -->
+<div class="chart-box">
+  <div class="chart-hdr">
+    <div class="chart-title">Comparativo de Lotação</div>
+    <div class="timer-row">
+      Próxima: <span id="tTxt">30s</span>
+      <div class="tbar"><div class="tfill" id="tFill" style="width:100%"></div></div>
+    </div>
+  </div>
+  <canvas id="chart" height="220"></canvas>
+</div>
+
+<!-- AD SIDE -->
+<div class="ad-side">
+  <div class="ad-label">Anúncio</div>
+  <div class="ad-side-icon">🩺</div>
+  <div class="ad-side-text">
+    <strong>Plano de Saúde Sulprev RJ</strong>
+    <span>Cobertura completa · Sem carência · A partir de R$ 89/mês</span>
+  </div>
+  <div class="ad-side-cta" onclick="openPlan()">Simular →</div>
+</div>
+
+<!-- LOG -->
+<div class="log-box">
+  <div class="log-title">— Log de Atualizações</div>
+  <div class="log-list" id="logList"></div>
+</div>
+
+<footer>
+  HospitalMap RJ &nbsp;·&nbsp; Dados simulados para fins informativos &nbsp;·&nbsp; Atualização a cada 30s<br>
+  Desenvolvido como projeto educacional &nbsp;·&nbsp; Funciona offline ✓
+</footer>
+</div>
+
+<!-- URGENCY MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeUrgency(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span style="font-size:26px">🚨</span>
+      <div class="modal-title">Atendimento Urgente</div>
+    </div>
+    <div class="modal-sub">Hospitais ordenados por menor espera agora</div>
+    <div id="modalList"></div>
+    <button class="modal-close" onclick="closeUrgencyBtn()">✕ Fechar</button>
+  </div>
+</div>
+
+<!-- PLAN MODAL -->
+<div class="plan-overlay" id="planOverlay" onclick="closePlanOverlay(event)">
+  <div class="plan-modal">
+    <div class="plan-header">
+      <div class="plan-header-icon">🩺</div>
+      <div>
+        <div class="plan-header-title">Plano de Saúde Sulprev RJ</div>
+        <div class="plan-header-sub">Cobertura nos 6 hospitais parceiros · Sem carência</div>
+      </div>
+      <div class="plan-header-badge">⭐ Parceiro Oficial</div>
+    </div>
+    <div class="plan-body">
+      <div class="plan-subtitle">— Escolha o hospital e veja seu plano</div>
+
+      <!-- Hospital Multimídia -->
+      <div class="plan-card destaque">
+        <div class="pc-top">
+          <div class="pc-icon">🏥</div>
+          <div class="pc-name">Hospital Multimídia</div>
+          <div class="pc-badge q-otimo">⭐ ÓTIMO</div>
+        </div>
+        <div class="pc-stars">
+          <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span>
+        </div>
+        <div class="pc-price-row">
+          <div class="pc-price">R$ 89</div>
+          <div class="pc-price-label">/mês</div>
+          <div class="pc-old">R$ 139</div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag yes">✓ Consultas ilimitadas</span>
+          <span class="pc-tag yes">✓ Exames inclusos</span>
+          <span class="pc-tag yes">✓ Sem carência</span>
+          <span class="pc-tag yes">✓ Pronto-socorro</span>
+        </div>
+        <div class="pc-desc">O Hospital Multimídia é referência em tecnologia hospitalar no RJ. Equipamentos de última geração, atendimento humanizado e corpo clínico altamente qualificado. Ideal para famílias que buscam o melhor custo-benefício com excelência no atendimento.</div>
+      </div>
+
+      <!-- Souza Aguiar -->
+      <div class="plan-card">
+        <div class="pc-top">
+          <div class="pc-icon">🏨</div>
+          <div class="pc-name">Hosp. Mun. Souza Aguiar</div>
+          <div class="pc-badge q-bom">👍 BOM</div>
+        </div>
+        <div class="pc-stars">
+          <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span>
+        </div>
+        <div class="pc-price-row">
+          <div class="pc-price">R$ 119</div>
+          <div class="pc-price-label">/mês</div>
+          <div class="pc-old">R$ 179</div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag yes">✓ Pronto-socorro 24h</span>
+          <span class="pc-tag yes">✓ UTI disponível</span>
+          <span class="pc-tag yes">✓ Cirurgias eletivas</span>
+          <span class="pc-tag">⚠ Carência 30 dias</span>
+        </div>
+        <div class="pc-desc">Um dos maiores hospitais municipais do Brasil, localizado no Centro do RJ. Atende emergências de alta complexidade 24h. Plano recomendado para quem mora no centro ou trabalha na região portuária e arredores.</div>
+      </div>
+
+      <!-- Getúlio Vargas -->
+      <div class="plan-card">
+        <div class="pc-top">
+          <div class="pc-icon">🏩</div>
+          <div class="pc-name">Hosp. Est. Getúlio Vargas</div>
+          <div class="pc-badge q-bom">👍 BOM</div>
+        </div>
+        <div class="pc-stars">
+          <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span>
+        </div>
+        <div class="pc-price-row">
+          <div class="pc-price">R$ 99</div>
+          <div class="pc-price-label">/mês</div>
+          <div class="pc-old">R$ 149</div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag yes">✓ Trauma e ortopedia</span>
+          <span class="pc-tag yes">✓ Neurologia</span>
+          <span class="pc-tag yes">✓ Pediatria</span>
+          <span class="pc-tag">⚠ Carência 15 dias</span>
+        </div>
+        <div class="pc-desc">Referência estadual em trauma e neurologia. Localizado na Penha, atende toda a Zona Norte com especialistas renomados. Plano indicado para moradores do subúrbio e Zona Norte carioca que precisam de cobertura próxima de casa.</div>
+      </div>
+
+      <!-- UPA Ilha -->
+      <div class="plan-card">
+        <div class="pc-top">
+          <div class="pc-icon">🚑</div>
+          <div class="pc-name">UPA Ilha do Governador</div>
+          <div class="pc-badge q-regular">⚠ REGULAR</div>
+        </div>
+        <div class="pc-stars">
+          <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span><span class="star">★</span>
+        </div>
+        <div class="pc-price-row">
+          <div class="pc-price">R$ 69</div>
+          <div class="pc-price-label">/mês</div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag yes">✓ Urgência e emergência</span>
+          <span class="pc-tag yes">✓ Sem carência</span>
+          <span class="pc-tag">✗ Sem internação</span>
+          <span class="pc-tag">✗ Cirurgias não cobertas</span>
+        </div>
+        <div class="pc-desc">Plano básico de pronto-atendimento, ideal para moradores da Ilha do Governador e Galeão. Cobre consultas de urgência e exames de rotina. Plano de entrada recomendado para quem busca o menor preço com cobertura local essencial.</div>
+      </div>
+
+      <!-- Hospital da Lagoa -->
+      <div class="plan-card">
+        <div class="pc-top">
+          <div class="pc-icon">🏛️</div>
+          <div class="pc-name">Hosp. Federal da Lagoa</div>
+          <div class="pc-badge q-otimo">⭐ ÓTIMO</div>
+        </div>
+        <div class="pc-stars">
+          <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span>
+        </div>
+        <div class="pc-price-row">
+          <div class="pc-price">R$ 149</div>
+          <div class="pc-price-label">/mês</div>
+          <div class="pc-old">R$ 219</div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag yes">✓ Cardiologia avançada</span>
+          <span class="pc-tag yes">✓ Oncologia</span>
+          <span class="pc-tag yes">✓ Check-up anual grátis</span>
+          <span class="pc-tag yes">✓ Telemedicina 24h</span>
+        </div>
+        <div class="pc-desc">Hospital federal de excelência na Zona Sul do RJ. Referência em cardiologia, oncologia e medicina preventiva. Plano premium recomendado para quem mora na Zona Sul, Barra e Tijuca e deseja atendimento de alto padrão com cobertura ampla.</div>
+      </div>
+
+      <!-- UPA Vila Kennedy -->
+      <div class="plan-card" style="border-color:rgba(255,77,109,.3);background:linear-gradient(135deg,rgba(255,77,109,.06),rgba(255,77,109,.02))">
+        <div class="pc-top">
+          <div class="pc-icon">🏚️</div>
+          <div class="pc-name">UPA Vila Kennedy</div>
+          <div class="pc-badge" style="background:rgba(255,77,109,.15);color:#ff4d6d">💀 PÉSSIMO</div>
+        </div>
+        <div class="pc-stars">
+          <span class="star on">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+        </div>
+        <div class="pc-price-row">
+          <div class="pc-price" style="color:#ff8c42">Gratuito</div>
+          <div class="pc-price-label">(SUS)</div>
+        </div>
+        <div class="pc-tags">
+          <span class="pc-tag" style="border-color:rgba(255,77,109,.2);color:#ff4d6d">✗ Superlotado</span>
+          <span class="pc-tag" style="border-color:rgba(255,77,109,.2);color:#ff4d6d">✗ Falta de médicos</span>
+          <span class="pc-tag" style="border-color:rgba(255,77,109,.2);color:#ff4d6d">✗ Equipamentos velhos</span>
+          <span class="pc-tag yes">✓ Acesso gratuito</span>
+        </div>
+        <div class="pc-desc" style="border-color:rgba(255,77,109,.15)">UPA pública da Zona Oeste em situação crítica de infraestrutura. Falta de insumos, equipamentos defasados e alto índice de superlotação. Atende pelo SUS gratuitamente, mas com espera acima de 4h e estrutura precária. <strong style="color:#ff4d6d">Evite se possível — procure outro hospital.</strong> O plano Sulprev garante acesso prioritário nos demais hospitais parceiros.</div>
+      </div>
+
+      <button class="plan-cta" onclick="closePlanBtn()">📋 Contratar agora — Falar com consultor</button>
+      <button class="plan-close" onclick="closePlanBtn()">✕ Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════ DATA ══════════════
+// price: preço do plano (0 = SUS gratuito)
+// quality: 1–5 (define velocidade de saída e resistência à entrada)
+// caos: hospital público precário
+const H = [
+  {id:0, name:"Hospital Multimídia",        addr:"Av. Aura Elevada, 67\nRJ",              n:50, caos:false, price:89,  quality:5},
+  {id:1, name:"Hosp. Mun. Souza Aguiar",    addr:"Pça. da República, 111\nCentro, RJ",    n:50, caos:false, price:119, quality:4},
+  {id:2, name:"Hosp. Est. Getúlio Vargas",  addr:"Av. Suburbana, 1895\nPenha, RJ",        n:50, caos:false, price:99,  quality:4},
+  {id:3, name:"UPA Ilha do Governador",     addr:"R. Sgt. João Lopes, 100\nIlha do Gov.", n:50, caos:false, price:69,  quality:3},
+  {id:4, name:"Hosp. Federal da Lagoa",     addr:"R. Jardim Botânico, 501\nJardim Bot.",  n:50, caos:false, price:149, quality:5},
+  {id:5, name:"UPA Vila Kennedy",           addr:"R. Abelardo Bueno, 670\nVila Kennedy",  n:75, caos:true,  price:0,   quality:1},
+];
+const MAX = 120;
+let logs = [];
+
+// ══════════════ HELPERS ══════════════
+function status(n){
+  const p=n/MAX;
+  if(p<.4) return{c:'sl',l:'LIVRE'};
+  if(p<.65) return{c:'sm',l:'MODERADO'};
+  return{c:'sh',l:'LOTADO'};
+}
+function wait(n){
+  const load=n/MAX, mult=1+load*2.5;
+  const min=Math.round(n*3*mult/10)*5;
+  if(min<10) return '<10 min';
+  if(min>=180) return`~${Math.round(min/60)}h`;
+  return`~${min} min`;
+}
+function prio(rank){
+  const map={1:['prio-1','🟢 MELHOR OPÇÃO'],2:['prio-2','✅ BOA OPÇÃO'],3:['prio-3','⚠️ MODERADO'],4:['prio-4','🔴 LOTADO'],5:['prio-5','🔴 MUITO LOTADO']};
+  return map[rank]||map[5];
+}
+function sorted(){return [...H].sort((a,b)=>a.n-b.n)}
+function best(){return sorted()[0]}
+function pct(n){return Math.min(100,(n/MAX)*100).toFixed(1)+'%'}
+function now(){return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+
+// ══════════════ RANKS ══════════════
+function getRanks(){
+  const order=sorted().map(h=>h.id);
+  const ranks={};
+  order.forEach((id,i)=>ranks[id]=i+1);
+  return ranks;
+}
+
+// ══════════════ CARDS ══════════════
+function renderCards(){
+  const g=document.getElementById('grid');
+  const bst=best();
+  const ranks=getRanks();
+
+  if(!g.children.length){
+    g.innerHTML=H.map(h=>{
+      const s=status(h.n), ib=h.id===bst.id, r=ranks[h.id];
+      const [pc,pl]=prio(r);
+      return`<div class="hcard ${s.c}${ib?' best':''}${h.caos?' caos':''}" id="c${h.id}">
+        <div class="prio-tag ${pc}">${pl}</div>
+        ${ib?'<div class="btag">⭐</div>':''}
+        <div class="card-inner">
+          <div class="ch">
+            <div class="hname">${h.name}${h.caos?' 🏚️':''}</div>
+            <div class="spill">${s.l}</div>
+          </div>
+          <div class="haddr">${h.addr.replace('\n','<br>')}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+            <div style="font-size:11px;color:${h.price===0?'#ff8c42':'#ffd166'};font-family:monospace;font-weight:700">
+              ${h.price===0?'SUS gratuito':'R$'+h.price+'/mês'}
+            </div>
+            <div style="font-size:11px;letter-spacing:1px">${'★'.repeat(h.quality)+'☆'.repeat(5-h.quality)}</div>
+          </div>
+          <div class="obar"><div class="ofill" style="width:${pct(h.n)}"></div></div>
+          <div class="ocount">
+            <div class="cnum">${h.n}</div>
+            <div class="clbl">pessoas na fila</div>
+          </div>
+          <div class="wrow">
+            <div class="wlbl">⏱ Espera</div>
+            <div class="wval">${wait(h.n)}</div>
+          </div>
+          ${h.caos?'<div class="caos-alert">⚠️ CONDIÇÕES PRECÁRIAS · EVITAR</div>':''}
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    const ranks=getRanks();
+    H.forEach(h=>{
+      const el=document.getElementById('c'+h.id);
+      if(!el) return;
+      const s=status(h.n), ib=h.id===bst.id, r=ranks[h.id];
+      const [pc,pl]=prio(r);
+      el.className=`hcard ${s.c}${ib?' best':''} flash`;
+      setTimeout(()=>el.classList.remove('flash'),800);
+      el.querySelector('.prio-tag').className=`prio-tag ${pc}`;
+      el.querySelector('.prio-tag').textContent=pl;
+      el.querySelector('.spill').textContent=s.l;
+      el.querySelector('.ofill').style.width=pct(h.n);
+      el.querySelector('.cnum').textContent=h.n;
+      el.querySelector('.wval').textContent=wait(h.n);
+      const t=el.querySelector('.btag');
+      if(ib&&!t){const d=document.createElement('div');d.className='btag';d.textContent='⭐';el.appendChild(d);}
+      else if(!ib&&t) t.remove();
+    });
+  }
+}
+
+// ══════════════ BANNER ══════════════
+function renderBanner(){
+  const b=best(), s=status(b.n);
+  document.getElementById('bName').textContent=b.name;
+  document.getElementById('bNum').textContent=b.n;
+  document.getElementById('bDetail').textContent=b.addr.replace('\n',' — ')+' · '+s.l;
+  document.getElementById('bWait').textContent='⏱ Tempo de espera estimado: '+wait(b.n);
+}
+
+// ══════════════ URGENCY MODAL ══════════════
+function openUrgency(){
+  const top3=sorted().slice(0,3);
+  const rankLabels=['1º','2º','3º'];
+  const rankClasses=['rank-1','rank-2','rank-3'];
+  document.getElementById('modalList').innerHTML=top3.map((h,i)=>`
+    <div class="modal-hosp${i===0?' best-urg':''}">
+      <div class="modal-rank ${rankClasses[i]}">${rankLabels[i]}</div>
+      <div class="modal-hosp-info">
+        <div class="modal-hosp-name">${h.name}</div>
+        <div class="modal-hosp-meta">${h.addr.replace('\n',' · ')} · ${h.n} pessoas</div>
+      </div>
+      <div class="modal-hosp-wait">${wait(h.n)}</div>
+    </div>`).join('');
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeUrgency(e){if(e.target===document.getElementById('modalOverlay')) closeUrgencyBtn()}
+function closeUrgencyBtn(){document.getElementById('modalOverlay').classList.remove('show')}
+
+// ══════════════ CHART ══════════════
+function drawChart(){
+  const canvas=document.getElementById('chart');
+  const W=canvas.parentElement.clientWidth-36;
+  canvas.width=W; canvas.height=220;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,220);
+  const pad={t:22,r:8,b:62,l:46};
+  const cw=W-pad.l-pad.r, ch=220-pad.t-pad.b;
+  const bw=Math.max(18,Math.floor(cw/H.length)-16);
+  const gap=(cw-bw*H.length)/(H.length+1);
+
+  // grid
+  for(let i=0;i<=6;i++){
+    const y=pad.t+ch-(ch/6)*i;
+    ctx.strokeStyle='rgba(30,34,48,.9)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cw,y);ctx.stroke();
+    ctx.fillStyle='#5a6080';ctx.font='10px monospace';ctx.textAlign='right';
+    ctx.fillText(Math.round((MAX/6)*i),pad.l-5,y+3);
+  }
+
+  H.forEach((h,i)=>{
+    const s=status(h.n);
+    const x=pad.l+gap+(bw+gap)*i;
+    const bh=Math.max(2,(h.n/MAX)*ch);
+    const y=pad.t+ch-bh;
+    const col=s.c==='sl'?'#00e5a0':s.c==='sm'?'#ffd166':'#ff4d6d';
+    const colA=s.c==='sl'?'rgba(0,229,160,.15)':s.c==='sm'?'rgba(255,209,102,.15)':'rgba(255,77,109,.15)';
+
+    ctx.fillStyle=colA;
+    ctx.beginPath(); rr(ctx,x,y,bw,bh,6); ctx.fill();
+    ctx.fillStyle=col;
+    ctx.beginPath(); rr(ctx,x+2,y+2,bw-4,Math.max(1,bh-2),5); ctx.fill();
+
+    ctx.fillStyle=col;ctx.font='bold 11px monospace';ctx.textAlign='center';
+    ctx.fillText(h.n,x+bw/2,y-5);
+
+    const lbl=h.name.length>10?h.name.substring(0,10)+'…':h.name;
+    ctx.fillStyle='#5a6080';ctx.font='9px monospace';
+    ctx.save();ctx.translate(x+bw/2,pad.t+ch+13);ctx.rotate(-Math.PI/5.5);
+    ctx.textAlign='right';ctx.fillText(lbl,0,0);ctx.restore();
+  });
+
+  ctx.strokeStyle='#1e2230';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.l,pad.t);ctx.lineTo(pad.l,pad.t+ch);ctx.stroke();
+}
+function rr(ctx,x,y,w,h,r){
+  if(h<0){y+=h;h=-h;} if(h<r*2) r=h/2;
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+}
+
+// ══════════════ LOG ══════════════
+function addLog(name, delta, total, type){
+  const sign = type==='add' ? '+' : '−';
+  const color = type==='add' ? 'la' : 'ld';
+  logs.unshift({t:now(), name, delta, total, sign, color});
+  if(logs.length>16) logs.pop();
+  document.getElementById('logList').innerHTML=logs.map(l=>`
+    <div class="log-item">
+      <span class="lt">${l.t}</span><span>→</span>
+      <span class="lh">${l.name}</span>
+      <span class="${l.color}">${l.sign}${l.delta}</span>
+      <span style="color:#3a4060">total: ${l.total}</span>
+    </div>`).join('');
+}
+
+// ══════════════ UPDATE ══════════════
+function randomUpdate(){
+  /*
+    ENTRADAS (arrivals):
+    - SUS/gratuito (quality 1): 4x mais chance de receber pessoas
+    - quality 2: 2.5x
+    - quality 3: 1.5x  (público básico, ainda muito procurado)
+    - quality 4: 1x
+    - quality 5 + caro (price>=120): 0.5x  (plano caro filtra a demanda)
+
+    SAÍDAS (discharges):
+    - quality 5 + price alto: 3x mais saídas (atendimento rápido e eficiente)
+    - quality 4: 2x
+    - quality 3: 1x
+    - quality 1 (caos): 0.25x (atendimento lentíssimo, quase não sai ninguém)
+  */
+  const arrivalWeight = h => {
+    if(h.caos)          return 4;
+    if(h.quality <= 2)  return 2.5;
+    if(h.quality === 3) return 1.5;
+    if(h.price >= 120)  return 0.5;
+    return 1;
+  };
+  const exitWeight = h => {
+    if(h.caos)          return 0.25;
+    if(h.quality === 3) return 1;
+    if(h.quality === 4) return 2;
+    if(h.quality === 5 && h.price >= 120) return 3;
+    if(h.quality === 5) return 2.5;
+    return 1;
+  };
+
+  // Build arrival pool
+  const arrPool=[];
+  H.forEach((h,i)=>{
+    const w=arrivalWeight(h);
+    const slots=Math.max(1,Math.round(w*4));
+    for(let k=0;k<slots;k++) arrPool.push(i);
+  });
+
+  const adds=Array(H.length).fill(0);
+  for(let i=0;i<15;i++) adds[arrPool[Math.floor(Math.random()*arrPool.length)]]++;
+  adds.forEach((a,i)=>{
+    if(a>0){H[i].n=Math.min(MAX,H[i].n+a);addLog(H[i].name,a,H[i].n,'add');}
+  });
+
+  // Build exit pool
+  const total=Math.floor(Math.random()*7)+8;
+  const exitPool=[];
+  H.forEach((h,i)=>{
+    const w=exitWeight(h);
+    const slots=Math.max(1,Math.round(w*3));
+    for(let k=0;k<slots;k++) exitPool.push(i);
+  });
+
+  const drops=Array(H.length).fill(0);
+  for(let i=0;i<total;i++) drops[exitPool[Math.floor(Math.random()*exitPool.length)]]++;
+  drops.forEach((d,i)=>{
+    if(d>0 && H[i].n>0){
+      H[i].n=Math.max(0,H[i].n-d);
+      addLog(H[i].name,d,H[i].n,'drop');
+    }
+  });
+
+  renderCards();renderBanner();drawChart();
+}
+
+// ══════════════ TIMER ══════════════
+function startTimer(){
+  let elapsed=0;
+  const fill=document.getElementById('tFill'), txt=document.getElementById('tTxt');
+  setInterval(()=>{
+    elapsed++;
+    fill.style.width=((30-elapsed)/30*100)+'%';
+    txt.textContent=(30-elapsed)+'s';
+    if(elapsed>=30){randomUpdate();elapsed=0;}
+  },1000);
+}
+
+// ══════════════ PLAN MODAL ══════════════
+function openPlan(){
+  document.getElementById('planOverlay').classList.add('show');
+  document.body.style.overflow='hidden';
+}
+function closePlanOverlay(e){if(e.target===document.getElementById('planOverlay')) closePlanBtn()}
+function closePlanBtn(){
+  document.getElementById('planOverlay').classList.remove('show');
+  document.body.style.overflow='';
+}
+
+// ══════════════ INIT ══════════════
+renderCards(); renderBanner(); drawChart(); startTimer();
+window.addEventListener('resize',drawChart);
+document.getElementById('logList').innerHTML=`
+  <div class="log-item">
+    <span class="lt">${now()}</span><span>→</span>
+    <span class="lh" style="color:#00e5a0">Sistema iniciado — 6 hospitais monitorados</span>
+  </div>`;
+</script>
+</body>
+</html>
